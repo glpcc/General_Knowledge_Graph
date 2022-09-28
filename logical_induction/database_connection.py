@@ -23,28 +23,49 @@ class KGHandler():
         query = f'MATCH (n1 {{name: "{object_name}"}}) SET n1{":"*(len(labels)>0) + ":".join(labels)}'
         tx.run(query)
 
+    @staticmethod
+    def _get_object_attributes(tx: ManagedTransaction, object_name: str):
+        # Gets the attributes of a SINGLE object
+        query = f'MATCH (n1 {{name: "{object_name}"}}) RETURN n1'
+        result = tx.run(query)
+        return result.data()[0]
+    
+    @staticmethod
+    def _get_object_labels(tx: ManagedTransaction, object_name: str):
+        # Gets the lables of a SINGLE object
+        query = f'MATCH (n1 {{name: "{object_name}"}}) RETURN labels(n1)'
+        result = tx.run(query)
+        return result.data()[0]['labels(n1)']
+
     def create_object(self, object_attributes:dict , labels:list = []):
         with self.driver.session(database='objects') as session:
-            session.write_transaction(self._create_object,object_attributes,labels)
+            session.execute_write(self._create_object,object_attributes,labels)
 
     def create_relation(self,from_name: str, to_name: str,relation_type: str, relation_attributes: dict):
         with self.driver.session(database='objects') as session:
-            session.write_transaction(self._create_relation,from_name, to_name, relation_type, relation_attributes)
+            session.execute_write(self._create_relation,from_name, to_name, relation_type, relation_attributes)
     
     def create_label_relation(self,from_label_name: str, to_label_name: str,relation_type: str, relation_attributes: dict = {}):
         with self.driver.session(database='labels') as session:
-            session.write_transaction(self._create_relation,from_label_name, to_label_name, relation_type, relation_attributes)
+            session.execute_write(self._create_relation,from_label_name, to_label_name, relation_type, relation_attributes)
 
     def create_label(self, object_attributes:dict , labels:list = []):
         with self.driver.session(database='labels') as session:
-            session.write_transaction(self._create_object,object_attributes,labels)
+            session.execute_write(self._create_object,object_attributes,labels)
     
     def add_labels_to_object(self,object_name: str,labels: list = []):
         with self.driver.session(database='objects') as session:
-            session.write_transaction(self._set_label,object_name,labels)
+            session.execute_write(self._set_label,object_name,labels)
+    
+    def get_object(self,object_name: str):
+        with self.driver.session(database='objects') as session:
+            attributes = session.execute_read(self._get_object_attributes,object_name)
+            lables = session.execute_read(self._get_object_labels,object_name)
+        return attributes, lables
+      
 
-hand = KGHandler('bolt://localhost:7687', 'neo4j', '')
+hand = KGHandler('bolt://localhost:7687', 'neo4j', '123')
 
-hand.add_labels_to_object()
-
-# hand.close()
+result = hand.get_object('test_name')
+print(result)
+hand.close()
