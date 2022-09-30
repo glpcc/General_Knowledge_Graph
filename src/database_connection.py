@@ -1,3 +1,5 @@
+from operator import attrgetter
+from typing import List, Tuple
 from neo4j import GraphDatabase
 from neo4j import ManagedTransaction
 
@@ -38,34 +40,35 @@ class KGHandler():
         return result.data()[0]['labels(n1)']
 
     def create_object(self, object_attributes:dict , labels:list = []):
-        with self.driver.session(database='objects') as session:
+        with self.driver.session(database='knowledgegraph') as session:
             session.execute_write(self._create_object,object_attributes,labels)
 
+    def create_objects(self,objects: list[tuple[dict,list]]):
+        # TODO Change to a single query later
+        for attributes,labels in objects:
+            self.create_object(attributes,labels)
+
     def create_relation(self,from_name: str, to_name: str,relation_type: str, relation_attributes: dict):
-        with self.driver.session(database='objects') as session:
+        with self.driver.session(database='knowledgegraph') as session:
             session.execute_write(self._create_relation,from_name, to_name, relation_type, relation_attributes)
     
     def create_label_relation(self,from_label_name: str, to_label_name: str,relation_type: str, relation_attributes: dict = {}):
-        with self.driver.session(database='labels') as session:
+        with self.driver.session(database='knowledgegraph') as session:
             session.execute_write(self._create_relation,from_label_name, to_label_name, relation_type, relation_attributes)
 
     def create_label(self, object_attributes:dict , labels:list = []):
-        with self.driver.session(database='labels') as session:
+        with self.driver.session(database='knowledgegraph') as session:
             session.execute_write(self._create_object,object_attributes,labels)
     
     def add_labels_to_object(self,object_name: str,labels: list = []):
-        with self.driver.session(database='objects') as session:
+        with self.driver.session(database='knowledgegraph') as session:
             session.execute_write(self._set_label,object_name,labels)
     
     def get_object(self,object_name: str):
-        with self.driver.session(database='objects') as session:
+        with self.driver.session(database='knowledgegraph') as session:
             attributes = session.execute_read(self._get_object_attributes,object_name)
             lables = session.execute_read(self._get_object_labels,object_name)
         return attributes, lables
       
 
-hand = KGHandler('bolt://localhost:7687', 'neo4j', '123')
 
-result = hand.get_object('test_name')
-print(result)
-hand.close()
