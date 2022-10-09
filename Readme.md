@@ -8,7 +8,7 @@ The concept nodes will be an abstraction to represent relations and knowledge th
 
 ##### Classes
 
-This will represent classes of objects and it's relations, like for example the class Person  will have a relation IS to the class Animal
+This will represent classes of objects and it's relations, like for example the class Person  will have a relation SubclassOf to the class Animal
 
 ##### Properties
 
@@ -28,16 +28,4 @@ For maximum representation of knowledge, relations in this model will be nodes w
 
 #### Logical Nodes
 
-This nodes will be used for complex logical relations between concepts and objects, and will be of the following types.
-
-<details>
-  <summary>AND,OR</summary>
-  Nodes with two input relations as logical inputs and an output with
-  the result of the logical operation
-</details>
-
-<details>
-  <summary>IF</summary>
-  Nodes with two input relations as logical inputs and an output with
-  the result of the logical operation
-</details>
+To be implemented.
