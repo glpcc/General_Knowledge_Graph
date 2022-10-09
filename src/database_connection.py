@@ -26,12 +26,19 @@ class KGHandler():
         tx.run(query)
 
     @staticmethod
-    def _get_object_attributes(tx: ManagedTransaction, object_name: str):
+    def _get_object_properties(tx: ManagedTransaction, object_name: str):
         # Gets the attributes of a SINGLE object
         query = f'MATCH (n1 {{name: "{object_name}"}}) RETURN n1'
         result = tx.run(query)
-        return result.data()[0]
+        return result.data()[0]['n1']
     
+    @staticmethod
+    def _get_object_classes(tx: ManagedTransaction, object_name: str):
+        # Gets the lables of a SINGLE object
+        query = f'MATCH (n1 {{name: "{object_name}"}})-[:SubClassOf*]->(b) RETURN b.name'
+        result = tx.run(query)
+        return result.value()
+
     @staticmethod
     def _get_object_labels(tx: ManagedTransaction, object_name: str):
         # Gets the lables of a SINGLE object
@@ -48,17 +55,26 @@ class KGHandler():
         for attributes,labels in objects:
             self.create_object(attributes,labels)
 
+    def instanciate_full_relation(self,relation_name: str, related_relation_objects: dict):
+        with self.driver.session(database='knowledgegraph') as session:
+            relation_exists = session.run('OPTIONAL MATCH (n:RelationConcept { name: $name }) RETURN n IS NOT NULL AS Predicate', name=relation_name).value()
+            if relation_exists:
+                relationConcept_relations = session.run('MATCH (n:RelationConcept { name: $name })-[r]->(c) RETURN r',name=relation_name)
+                relationConcept_relations = [i['r'].type for i in relationConcept_relations]
+                if all(i in related_relation_objects for i in relationConcept_relations):
+                    session.run('MATCH (r2:RelationConcept { name: $name }) CREATE (r:Relation { name: $name}),(r)-[:INSTANCE_OF]->(r2)',name=relation_name)
+                    for r in relationConcept_relations:
+                        session.run(f'MATCH (n:Object {{ name: $objectname}}),(r:Relation {{ name: $relationConceptName}}) CREATE (n)-[:{r}]->(r)',
+                            objectname = related_relation_objects[r],
+                            relationConceptName = relation_name,
+                        )
+            else:
+                print(f'The Relation {relation_name} doesnt exist as a relation concept, try creating the relaton concept first')
+
+
     def create_relation(self,from_name: str, to_name: str,relation_type: str, relation_attributes: dict):
         with self.driver.session(database='knowledgegraph') as session:
             session.execute_write(self._create_relation,from_name, to_name, relation_type, relation_attributes)
-    
-    def create_label_relation(self,from_label_name: str, to_label_name: str,relation_type: str, relation_attributes: dict = {}):
-        with self.driver.session(database='knowledgegraph') as session:
-            session.execute_write(self._create_relation,from_label_name, to_label_name, relation_type, relation_attributes)
-
-    def create_label(self, object_attributes:dict , labels:list = []):
-        with self.driver.session(database='knowledgegraph') as session:
-            session.execute_write(self._create_object,object_attributes,labels)
     
     def add_labels_to_object(self,object_name: str,labels: list = []):
         with self.driver.session(database='knowledgegraph') as session:
@@ -66,9 +82,14 @@ class KGHandler():
     
     def get_object(self,object_name: str):
         with self.driver.session(database='knowledgegraph') as session:
-            attributes = session.execute_read(self._get_object_attributes,object_name)
-            lables = session.execute_read(self._get_object_labels,object_name)
-        return attributes, lables
+            properties = session.execute_read(self._get_object_properties,object_name)
+            classes = session.execute_read(self._get_object_classes,object_name)
+        obj = {
+            "name": object_name,
+            "properties": properties,
+            "classes": classes
+        }
+        return obj
       
 
 
