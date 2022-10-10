@@ -71,12 +71,25 @@ class KGHandler():
                         nameCount = len(relationConcept_relations)
                     ).value()
                     if objects_exits:
-                        session.run('MATCH (r2:RelationConcept { name: $name }) CREATE (r:Relation { name: $name}),(r)-[:INSTANCE_OF]->(r2)',name=relation_name)
+                        # Check if objects are instances of the needed class
+                        valid = True
                         for r in relationConcept_relations:
-                            session.run(f'MATCH (n:Object {{ name: $objectname}}),(r:Relation {{ name: $relationConceptName}}) CREATE (n)-[:{r}]->(r)',
-                                objectname = related_relation_objects_names[r],
-                                relationConceptName = relation_name,
-                            )
+                            valid = session.run(f'Match (n:Object {{ name: $objectname }}),(r:RelationConcept {{ name: $relationConceptName }}),(r)-[:{r}]->(p),(n)-[:INSTANCE_OF]->(t) RETURN p.name = t.name OR exists((t)-[:SUBCLASS_OF*]->(p))', 
+                            objectname = related_relation_objects_names[r],
+                            relationConceptName = relation_name
+                            ).value()
+                            if not valid:
+                                print(f'Object with name {related_relation_objects_names[r]} is not an istance of a class or subclass needed')
+                                break
+                        if valid:
+                            session.run('MATCH (r2:RelationConcept { name: $name }) CREATE (r:Relation { name: $name}),(r)-[:INSTANCE_OF]->(r2)',name=relation_name)
+                            for r in relationConcept_relations:
+                                session.run(f'MATCH (n:Object {{ name: $objectname}}),(r:Relation {{ name: $relationConceptName}}) CREATE (n)-[:{r}]->(r)',
+                                    objectname = related_relation_objects_names[r],
+                                    relationConceptName = relation_name,
+                                )
+                        else:
+                            print('Some objects given are not of the specified class')
                     else:
                         print(f'Not all the objects given exists in the graph')
                 else:

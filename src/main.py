@@ -12,6 +12,6 @@ hand = KGHandler('bolt://localhost:7687', 'neo4j', '123')
 #     ({'name':'MARRIED_TO'},['RelationConcept','Concept']),
 # ]
 # result = hand.create_objects(objects)
-hand.instanciate_full_relation('MARRY',{'Subject':'Will Smith','Object': 'Ada Smith'})
+hand.instanciate_full_relation('MARRY',{'Subject':'Wall Smith','Object': 'Ada Smith'})
 
 hand.close()
