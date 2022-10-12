@@ -72,7 +72,6 @@ class KGHandler():
             else:
                 print(f'The relation concept {relation_name} already exists')
   
-    # TODO
     def create_object(self,object_name: str, object_class: str):
         # TODO add properties
         with self.driver.session(database='knowledgegraph') as session:
@@ -80,20 +79,83 @@ class KGHandler():
             class_exists = session.run('OPTIONAL MATCH (n:Class:Concept { name: $name }) RETURN n IS NOT NULL AS Predicate', name=object_class).value()[0]
             if class_exists:
                 # TODO implement mandatory relations
-                session.run('MATCH (n:Class:Concept { name: $className }) CREATE (o:Object { name: $objName}),(o)-[:INSTANCE_OF]->(n)',
-                    className=object_class,
-                    objName=object_name
-                )
+                # Check if object alredy exists
+                object_exists = session.run('OPTIONAL MATCH (n:Object { name: $name }),(c:Class:Concept { name: $className }) WHERE (n)-[:INSTANCE_OF]->(c) RETURN n IS NOT NULL AS Predicate',
+                    name = object_name,
+                    className = object_class
+                ).value()[0]
+                if not object_exists:
+                    session.run('MATCH (n:Class:Concept { name: $className }) CREATE (o:Object { name: $objName}),(o)-[:INSTANCE_OF]->(n)',
+                        className=object_class,
+                        objName=object_name
+                    )
+                else:
+                    print(f'The object with name {object_name} instance of {object_class} already exists')
             else:
                 print(f'The class given {object_class} doesnt exists in the knowledge graph')
 
+    def create_property(self,property_name: str ,value_type: str):
+        with self.driver.session(database='knowledgegraph') as session:
+            # Check if property already exists
+            property_exists = session.run('OPTIONAL MATCH (n:Concept:Property { name: $name }) RETURN n IS NOT NULL AS Predicate', name=property_name).value()[0]
+            if not property_exists:
+                # Check if type is valid
+                # TODO add optional types and lists
+                if value_type in ['str','int','float','bool']:
+                    session.run('CREATE (o:Property:Concept { name: $propName,type: $propType})',
+                        propType=value_type,
+                        propName=property_name
+                    )
+                else:
+                    print(f"Type given {value_type} is not in the valid types ['str','int','float','bool']")
+            else:
+                print(f'Property with name {property_name} already exists')
+    
     # TODO
-    def create_property(self):
-        ...
-
-    # TODO
-    def create_class(self): ...
-
+    def create_class(self,class_name: str,properties: list[str] ,subclass_of: str | None = None):
+        with self.driver.session(database='knowledgegraph') as session:
+            # Check if class already exists
+            class_exists = session.run('OPTIONAL MATCH (n:Concept:Class { name: $name }) RETURN n IS NOT NULL AS Predicate', name=class_name).value()[0]
+            if not class_exists:
+                # Check if properties given exists 
+                properties_exists = session.run('MATCH (n:Concept:Property) WHERE n.name IN $properties RETURN count(n)=$numProps', 
+                    properties=properties,
+                    numProps=len(properties)
+                ).value()[0]
+                # TODO implement optional and obligatory properties
+                if properties_exists:
+                    if subclass_of is None:
+                        session.run('CREATE (n:Concept:Class { name: $className })',
+                            className=class_name
+                        )
+                        session.run('MATCH (p:Concept:Property),(n:Concept:Class { name: $className }) WHERE p.name IN $properties CREATE (n)-[:HAS_PROPERTY]->(p)',
+                            className=class_name,
+                            properties=properties
+                        )
+                    else:
+                        # Check if parent class exists
+                        parent_class_exists = session.run('OPTIONAL MATCH (n:Concept:Class { name: $name }) RETURN n IS NOT NULL AS Predicate', name=subclass_of).value()[0]
+                        if parent_class_exists:
+                            session.run('CREATE (n:Concept:Class { name: $className })',
+                                className=class_name
+                            )
+                            session.run(
+                                "MATCH (c:Concept:Class { name: 'Animal' }),(n:Concept:Class { name: 'Dog' })\
+                                CREATE (n)-[:SUBCLASS_OF]->(c)\
+                                WITH n\
+                                MATCH (p:Concept:Property)\
+                                WHERE p.name IN ['Height','Weight']\
+                                CREATE (n)-[:HAS_PROPERTY]->(p)",
+                                className=class_name,
+                                properties=properties ,
+                                parentName=subclass_of
+                            )
+                        else:
+                            print(f'The parent class {subclass_of} doesnt exists in the graph')
+                else:
+                    print('Not all the properties given exist in the graph')
+            else:
+                print(f'Class with name {class_name} alredy exists')
     # TODO
     def get_object(self):
         ...
