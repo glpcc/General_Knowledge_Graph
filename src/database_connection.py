@@ -1,5 +1,3 @@
-from operator import attrgetter
-from typing import List, Tuple
 from neo4j import GraphDatabase
 from neo4j import ManagedTransaction
 
@@ -9,51 +7,6 @@ class KGHandler():
     
     def close(self):
         self.driver.close()
-
-    @staticmethod
-    def _create_object(tx: ManagedTransaction,object_attributes: dict , labels: list = []):
-        query = f'CREATE (n{":"*(len(labels)>0) + ":".join(labels)} $attrs)'
-        tx.run(query,attrs = object_attributes)
-    
-    @staticmethod
-    def _create_relation(tx: ManagedTransaction ,from_name: str, to_name: str,relation_type: str, relation_attributes: dict):
-        query = f'MATCH (n1 {{name: "{from_name}"}}),(n2 {{name: "{to_name}"}}) CREATE (n1)-[r:{relation_type} $attrs]->(n2) '
-        tx.run(query,attrs = relation_attributes)
-    
-    @staticmethod
-    def _set_label(tx: ManagedTransaction, object_name: str, labels: list):
-        query = f'MATCH (n1 {{name: "{object_name}"}}) SET n1{":"*(len(labels)>0) + ":".join(labels)}'
-        tx.run(query)
-
-    @staticmethod
-    def _get_object_properties(tx: ManagedTransaction, object_name: str):
-        # Gets the attributes of a SINGLE object
-        query = f'MATCH (n1 {{name: "{object_name}"}}) RETURN n1'
-        result = tx.run(query)
-        return result.data()[0]['n1']
-    
-    @staticmethod
-    def _get_object_classes(tx: ManagedTransaction, object_name: str):
-        # Gets the lables of a SINGLE object
-        query = f'MATCH (n1 {{name: "{object_name}"}})-[:SubClassOf*]->(b) RETURN b.name'
-        result = tx.run(query)
-        return result.value()
-
-    @staticmethod
-    def _get_object_labels(tx: ManagedTransaction, object_name: str):
-        # Gets the lables of a SINGLE object
-        query = f'MATCH (n1 {{name: "{object_name}"}}) RETURN labels(n1)'
-        result = tx.run(query)
-        return result.data()[0]['labels(n1)']
-
-    def create_object(self, object_attributes:dict , labels:list = []):
-        with self.driver.session(database='knowledgegraph') as session:
-            session.execute_write(self._create_object,object_attributes,labels)
-
-    def create_objects(self,objects: list[tuple[dict,list]]):
-        # TODO Change to a single query later
-        for attributes,labels in objects:
-            self.create_object(attributes,labels)
 
     def instanciate_full_relation(self,relation_name: str, relation_related_objects_names: dict):
         with self.driver.session(database='knowledgegraph') as session:
@@ -108,7 +61,7 @@ class KGHandler():
                     nameCount = len(relation_related_concepts_names)
                 ).value()[0]
                 if concepts_exits:
-                    session.run('CREATE (r:RelationConcept { name:$name })',name=relation_name)
+                    session.run('CREATE (r:RelationConcept:Concept { name:$name })',name=relation_name)
                     for i in relation_related_concepts_names:
                         session.run(f'MATCH (r:RelationConcept {{ name:$name }}),(c:Concept {{name:$conceptName}}) CREATE (r)-[:{i}]->(c)',
                             name=relation_name,
@@ -118,25 +71,51 @@ class KGHandler():
                     print('Not all the Concepts given exists')
             else:
                 print(f'The relation concept {relation_name} already exists')
+  
+    # TODO
+    def create_object(self):
+        ...
 
-    def create_relation(self,from_name: str, to_name: str,relation_type: str, relation_attributes: dict):
-        with self.driver.session(database='knowledgegraph') as session:
-            session.execute_write(self._create_relation,from_name, to_name, relation_type, relation_attributes)
-    
-    def add_labels_to_object(self,object_name: str,labels: list = []):
-        with self.driver.session(database='knowledgegraph') as session:
-            session.execute_write(self._set_label,object_name,labels)
-    
+    # TODO
+    def create_property(self):
+        ...
+
+    # TODO
+    def create_class(self): ...
+
+    # TODO
     def get_object(self,object_name: str):
-        with self.driver.session(database='knowledgegraph') as session:
-            properties = session.execute_read(self._get_object_properties,object_name)
-            classes = session.execute_read(self._get_object_classes,object_name)
-        obj = {
-            "name": object_name,
-            "properties": properties,
-            "classes": classes
-        }
-        return obj
-      
+        ...
+
+    # TODO
+    def get_relation(self): ...
+
+    # TODO
+    def get_relation_concept(self): ...
+
+    # TODO
+    def get_property(self): ...
+
+    # TODO
+    def get_class(self): ...
+
+    # TODO
+    def edit_property_value(self):
+        ...
+    
+    # TODO 
+    def remove_property(self): ...
+
+    # TODO
+    def remove_object(self): ...
+
+    # TODO
+    def remove_class(self): ...
+
+    # TODO
+    def remove_relation(self): ...
+
+    # TODO
+    def remove_relation_concept(self): ...
 
 
