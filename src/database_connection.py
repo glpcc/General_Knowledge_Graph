@@ -73,8 +73,19 @@ class KGHandler():
                 print(f'The relation concept {relation_name} already exists')
   
     # TODO
-    def create_object(self):
-        ...
+    def create_object(self,object_name: str, object_class: str):
+        # TODO add properties
+        with self.driver.session(database='knowledgegraph') as session:
+            # Check if class exists
+            class_exists = session.run('OPTIONAL MATCH (n:Class:Concept { name: $name }) RETURN n IS NOT NULL AS Predicate', name=object_class).value()[0]
+            if class_exists:
+                # TODO implement mandatory relations
+                session.run('MATCH (n:Class:Concept { name: $className }) CREATE (o:Object { name: $objName}),(o)-[:INSTANCE_OF]->(n)',
+                    className=object_class,
+                    objName=object_name
+                )
+            else:
+                print(f'The class given {object_class} doesnt exists in the knowledge graph')
 
     # TODO
     def create_property(self):
@@ -84,7 +95,7 @@ class KGHandler():
     def create_class(self): ...
 
     # TODO
-    def get_object(self,object_name: str):
+    def get_object(self):
         ...
 
     # TODO
