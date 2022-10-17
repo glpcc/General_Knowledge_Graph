@@ -111,7 +111,6 @@ class KGHandler():
             else:
                 print(f'Property with name {property_name} already exists')
     
-    # TODO
     def create_class(self,class_name: str,properties: list[str] ,subclass_of: str | None = None):
         with self.driver.session(database='knowledgegraph') as session:
             # Check if class already exists
@@ -156,9 +155,33 @@ class KGHandler():
                     print('Not all the properties given exist in the graph')
             else:
                 print(f'Class with name {class_name} alredy exists')
+    
     # TODO
-    def get_object(self):
-        ...
+    def get_object(self,object_name,get_suprclasses: bool = True, get_relations: bool = True):
+        response = {}
+        with self.driver.session(database='knowledgegraph') as session:
+            # Name in this cases is consider to be a universal identifier (it will be changed to be named id later)
+            obj = session.run('OPTIONAL MATCH (n:Object { name: $name}) RETURN n',name=object_name).value()[0]
+            if obj is not None:
+                response['labels'] = list(obj.labels)
+                response['properties'] = obj._properties
+                response['element_id'] = obj.element_id
+                if get_suprclasses:
+                    super_classes = session.run('MATCH (n:Object { name: $name}),(n)-[:INSTANCE_OF]->(c:Class),(c)-[:SUBCLASS_OF*]->(d) RETURN collect(distinct c.name) + collect(d.name) as superclasses',name=object_name).value()
+                    response['instance_of'] = super_classes[0][0]
+                    response['super_classes'] = super_classes[0]
+                if get_relations:
+                    relations = session.run("MATCH (n:Object { name: $name}) WITH n MATCH (r:Relation)-->(n) with n,r MATCH (r)-[d]->(c) WHERE not type(d)='INSTANCE_OF' RETURN distinct r.name,collect(type(d)),collect(c.name)",name=object_name).data()
+                    print(relations)
+                    response['relations'] = [{}]
+
+
+                return response
+            else:
+                print('The object given doesnt exists')
+                return response
+
+
 
     # TODO
     def get_relation(self): ...
