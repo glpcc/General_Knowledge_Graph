@@ -35,11 +35,12 @@ class KGHandler():
                                 print(f'Object with name {relation_related_objects_names[r]} is not an istance of a class or subclass needed')
                                 break
                         if valid:
-                            session.run('MATCH (r2:RelationConcept { name: $name }) CREATE (r:Relation { name: $name}),(r)-[:INSTANCE_OF]->(r2)',name=relation_name)
+                            relation_id = session.run('MATCH (r2:RelationConcept { name: $name }) CREATE (r:Relation { name: $name}),(r)-[:INSTANCE_OF]->(r2) RETURN id(r)',name=relation_name).value()[0]
                             for r in relationConcept_relations:
-                                session.run(f'MATCH (n:Object {{ name: $objectname}}),(r:Relation {{ name: $relationConceptName}}) CREATE (r)-[:{r}]->(n)',
+                                session.run(f'MATCH (n:Object {{ name: $objectname}}),(r:Relation {{ name: $relationConceptName}}) WHERE id(r)=$iden CREATE (r)-[:{r}]->(n)',
                                     objectname = relation_related_objects_names[r],
                                     relationConceptName = relation_name,
+                                    iden = relation_id
                                 )
                         else:
                             print('Some objects given are not of the specified class')
@@ -157,7 +158,7 @@ class KGHandler():
                 print(f'Class with name {class_name} alredy exists')
     
     # TODO
-    def get_object(self,object_name,get_suprclasses: bool = True, get_relations: bool = True):
+    def get_object(self,object_name,get_superclasses: bool = True, get_relations: bool = True):
         response = {}
         with self.driver.session(database='knowledgegraph') as session:
             # Name in this cases is consider to be a universal identifier (it will be changed to be named id later)
@@ -166,14 +167,16 @@ class KGHandler():
                 response['labels'] = list(obj.labels)
                 response['properties'] = obj._properties
                 response['element_id'] = obj.element_id
-                if get_suprclasses:
+                if get_superclasses:
                     super_classes = session.run('MATCH (n:Object { name: $name}),(n)-[:INSTANCE_OF]->(c:Class),(c)-[:SUBCLASS_OF*]->(d) RETURN collect(distinct c.name) + collect(d.name) as superclasses',name=object_name).value()
                     response['instance_of'] = super_classes[0][0]
                     response['super_classes'] = super_classes[0]
                 if get_relations:
-                    relations = session.run("MATCH (n:Object { name: $name}) WITH n MATCH (r:Relation)-->(n) with n,r MATCH (r)-[d]->(c) WHERE not type(d)='INSTANCE_OF' RETURN distinct r.name,collect(type(d)),collect(c.name)",name=object_name).data()
-                    print(relations)
-                    response['relations'] = [{}]
+                    # relations = session.run("MATCH (n:Object { name: $name}) WITH n MATCH (r:Relation)-->(n) with n,r MATCH (r)-[d]->(c) WHERE not type(d)='INSTANCE_OF' RETURN distinct r.name,collect(type(d)),collect(c.name)",name=object_name).data()
+                    relations = session.run("MATCH (n:Object { name: $name}) WITH n MATCH (r:Relation)-->(n) RETURN distinct r.name,id(r)",name=object_name).data()
+                    response['relations'] = []
+                    for relation in relations:
+                        response['relations'].append(self.get_relation(relation['r.name'],relation['id(r)']))
 
 
                 return response
@@ -184,7 +187,43 @@ class KGHandler():
 
 
     # TODO
-    def get_relation(self): ...
+    def get_relation(self,relation_name: str,relation_node_id: int = -1):
+        # If relation Id is not given the function will return all the instances of that relation
+
+        response = {}
+        with self.driver.session(database='knowledgegraph') as session:
+            if relation_node_id < 0:
+                # If id not given will return a list of the participants in all the instances of the relations
+                relation_participants = session.run("MATCH (r:Relation { name: $name }),(r)-[d]->(n) WHERE NOT type(d)='INSTANCE_OF' RETURN id(r),type(d),n.name",name=relation_name).data()
+                if len(relation_participants) == 0:
+                    print('There Is no relation with that name')
+                    return {relation_name:[]}
+                response[relation_name] = []
+                last_id = -1
+                temp = {}
+                print(relation_participants)
+                for participant in relation_participants:
+                    if last_id != participant['id(r)']:
+                        if temp != {}:
+                            response[relation_name].append(temp)
+                        temp = {}
+                    temp[participant['type(d)']] = participant['n.name']
+                    last_id = participant['id(r)']
+                response[relation_name].append(temp)
+                return response
+            else:
+                # If id is given will return the dict with the relation participants
+                relation_participants = session.run("MATCH (r:Relation { name:$name }),(r)-[d]->(n) WHERE NOT type(d)='INSTANCE_OF' AND id(r)=$iden RETURN id(r),type(d),n.name",
+                    name=relation_name,
+                    iden=relation_node_id
+                ).data()
+                if len(relation_participants) == 0:
+                    print('There Is no relation with that name or id')
+                    return {relation_name:{}}
+                response[relation_name] = {}
+                for participant in relation_participants:
+                    response[relation_name][participant['type(d)']] = participant['n.name']
+                return response
 
     # TODO
     def get_relation_concept(self): ...
