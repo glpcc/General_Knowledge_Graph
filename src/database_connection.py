@@ -3,13 +3,18 @@ from neo4j import ManagedTransaction
 
 class KGHandler():
     def __init__(self, uri: str, user: str, password: str) -> None:
-        self.driver = GraphDatabase.driver(uri,auth=(user,password))
+        self.__driver = GraphDatabase.driver(uri,auth=(user,password))
     
+    def run_query(self,query: str):
+        # RUN AT YOUR OWN RISK NO COMPROBATIONS WILL BE MADE
+        with self.__driver.session(database='knowledgegraph') as session:
+            session.run(query)
+            
     def close(self):
-        self.driver.close()
+        self.__driver.close()
 
     def instanciate_full_relation(self,relation_name: str, relation_related_objects_names: dict):
-        with self.driver.session(database='knowledgegraph') as session:
+        with self.__driver.session(database='knowledgegraph') as session:
             # Check if the relation class exists
             relation_exists = session.run('OPTIONAL MATCH (n:RelationConcept { name: $name }) RETURN n IS NOT NULL AS Predicate', name=relation_name).value()[0]
             if relation_exists:
@@ -52,7 +57,7 @@ class KGHandler():
                 print(f'The Relation {relation_name} doesnt exist as a relation concept, try creating the relaton concept first')
 
     def create_relation_concept(self, relation_name: str, relation_related_concepts_names: dict):
-        with self.driver.session(database='knowledgegraph') as session:
+        with self.__driver.session(database='knowledgegraph') as session:
             # Check if the relation concept already exists
             relation_exists = session.run('OPTIONAL MATCH (n:RelationConcept { name: $name }) RETURN n IS NOT NULL AS Predicate', name=relation_name).value()[0]
             if not relation_exists:
@@ -75,7 +80,7 @@ class KGHandler():
   
     def create_object(self,object_name: str, object_class: str):
         # TODO add properties
-        with self.driver.session(database='knowledgegraph') as session:
+        with self.__driver.session(database='knowledgegraph') as session:
             # Check if class exists
             class_exists = session.run('OPTIONAL MATCH (n:Class:Concept { name: $name }) RETURN n IS NOT NULL AS Predicate', name=object_class).value()[0]
             if class_exists:
@@ -96,7 +101,7 @@ class KGHandler():
                 print(f'The class given {object_class} doesnt exists in the knowledge graph')
 
     def create_property(self,property_name: str ,value_type: str):
-        with self.driver.session(database='knowledgegraph') as session:
+        with self.__driver.session(database='knowledgegraph') as session:
             # Check if property already exists
             property_exists = session.run('OPTIONAL MATCH (n:Concept:Property { name: $name }) RETURN n IS NOT NULL AS Predicate', name=property_name).value()[0]
             if not property_exists:
@@ -113,7 +118,7 @@ class KGHandler():
                 print(f'Property with name {property_name} already exists')
     
     def create_class(self,class_name: str,properties: list[str] ,subclass_of: str | None = None):
-        with self.driver.session(database='knowledgegraph') as session:
+        with self.__driver.session(database='knowledgegraph') as session:
             # Check if class already exists
             class_exists = session.run('OPTIONAL MATCH (n:Concept:Class { name: $name }) RETURN n IS NOT NULL AS Predicate', name=class_name).value()[0]
             if not class_exists:
@@ -157,10 +162,9 @@ class KGHandler():
             else:
                 print(f'Class with name {class_name} alredy exists')
     
-    # TODO
     def get_object(self,object_name,get_superclasses: bool = True, get_relations: bool = True):
         response = {}
-        with self.driver.session(database='knowledgegraph') as session:
+        with self.__driver.session(database='knowledgegraph') as session:
             # Name in this cases is consider to be a universal identifier (it will be changed to be named id later)
             obj = session.run('OPTIONAL MATCH (n:Object { name: $name}) RETURN n',name=object_name).value()[0]
             if obj is not None:
@@ -184,14 +188,10 @@ class KGHandler():
                 print('The object given doesnt exists')
                 return response
 
-
-
-    # TODO
     def get_relation(self,relation_name: str,relation_node_id: int = -1):
         # If relation Id is not given the function will return all the instances of that relation
-
         response = {}
-        with self.driver.session(database='knowledgegraph') as session:
+        with self.__driver.session(database='knowledgegraph') as session:
             if relation_node_id < 0:
                 # If id not given will return a list of the participants in all the instances of the relations
                 relation_participants = session.run("MATCH (r:Relation { name: $name }),(r)-[d]->(n) WHERE NOT type(d)='INSTANCE_OF' RETURN id(r),type(d),n.name",name=relation_name).data()
@@ -225,12 +225,23 @@ class KGHandler():
                     response[relation_name][participant['type(d)']] = participant['n.name']
                 return response
 
-    # TODO
-    def get_relation_concept(self): ...
-
-    # TODO
-    def get_property(self): ...
-
+    def get_relation_concept(self,relation_concept_name: str):
+        with self.__driver.session(database='knowledgegraph') as session:
+            relation_concept = session.run("OPTIONAL MATCH (n:RelationConcept { name:$name }),(n)-[r]->(c) RETURN type(r),c",
+                name=relation_concept_name
+            ).data()
+            if relation_concept[0]['type(r)'] is None:
+                print('The relation Concept doesnt exist')
+                return None
+            return { relation_concept_name: {i['type(r)']:i['c']['name'] for i in relation_concept} }
+            
+    def get_property_type(self,property_concept_name: str):
+        with self.__driver.session(database='knowledgegraph') as session:
+            prop_type = session.run('MATCH (n:Property { name: $name }) RETURN n.type',name=property_concept_name).value()
+            if len(prop_type) == 0:
+                print(f'No property with name "{property_concept_name}"')
+                return None
+            return prop_type[0]
     # TODO
     def get_class(self): ...
 

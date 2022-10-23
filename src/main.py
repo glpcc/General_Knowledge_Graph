@@ -17,7 +17,10 @@ hand = KGHandler('bolt://localhost:7687', 'neo4j', '123')
 # hand.create_object('Peter','Person')
 # hand.create_property('Weight','float')
 # hand.create_class('Dog',['Height','Weight'],'Animal')
+# print(hand.get_relation('M'))
+# print(hand.get_relation_concept('MARRY'))
+print(hand.get_property_type('Heigh'))
 
-print(hand.get_relation('M'))
+
 
 hand.close()
